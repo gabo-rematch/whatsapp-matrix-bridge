@@ -381,13 +381,16 @@ func (wa *WhatsAppClient) GetJoinedGroups(ctx context.Context) ([]WhatsAppGroup,
 	// Set LastHistorySync to 24 hours ago to force a new sync
 	loginMetadata := wa.UserLogin.Metadata.(*waid.UserLoginMetadata)
 	loginMetadata.LastHistorySync = jsontime.Unix{Time: time.Now().Add(-24 * time.Hour)}
-	wa.UserLogin.Log.Debug().Time("history_sync_reset_to", loginMetadata.LastHistorySync.Time).Msg("Reset LastHistorySync to 24 hours ago for GetJoinedGroups")
+	wa.UserLogin.Log.Info().Time("last_history_sync", loginMetadata.LastHistorySync.Time).Msg("LastHistorySync time has been updated to force WhatsApp sync")
 
 	// Save the updated metadata
 	err := wa.UserLogin.Save(ctx)
 	if err != nil {
 		wa.UserLogin.Log.Err(err).Msg("Failed to save updated LastHistorySync timestamp")
 	}
+
+	// Log the start of WhatsApp sync
+	wa.UserLogin.Log.Info().Msg("Syncing with WhatsApp started")
 
 	// Get list of joined groups from whatsmeow
 	whatsmeowGroups, err := wa.Client.GetJoinedGroups()
@@ -451,13 +454,16 @@ func (wa *WhatsAppClient) GetFormattedGroups(ctx context.Context) (string, error
 	// Set LastHistorySync to 24 hours ago to force a new sync
 	loginMetadata := wa.UserLogin.Metadata.(*waid.UserLoginMetadata)
 	loginMetadata.LastHistorySync = jsontime.Unix{Time: time.Now().Add(-24 * time.Hour)}
-	wa.UserLogin.Log.Debug().Time("history_sync_reset_to", loginMetadata.LastHistorySync.Time).Msg("Reset LastHistorySync to 24 hours ago for GetFormattedGroups")
+	wa.UserLogin.Log.Info().Time("last_history_sync", loginMetadata.LastHistorySync.Time).Msg("LastHistorySync time has been updated to force WhatsApp sync")
 
 	// Save the updated metadata
 	err := wa.UserLogin.Save(ctx)
 	if err != nil {
 		wa.UserLogin.Log.Err(err).Msg("Failed to save updated LastHistorySync timestamp")
 	}
+
+	// Log the start of WhatsApp sync
+	wa.UserLogin.Log.Info().Msg("Syncing with WhatsApp started")
 
 	// Get current user's JID
 	userWANumber := wa.JID.User
@@ -550,7 +556,7 @@ func (wa *WhatsAppClient) SendGroupsToReMatchBackend(ctx context.Context) error 
 	// Set LastHistorySync to 24 hours ago to force a new sync
 	loginMetadata := wa.UserLogin.Metadata.(*waid.UserLoginMetadata)
 	loginMetadata.LastHistorySync = jsontime.Unix{Time: time.Now().Add(-24 * time.Hour)}
-	wa.UserLogin.Log.Debug().Time("history_sync_reset_to", loginMetadata.LastHistorySync.Time).Msg("Reset LastHistorySync to 24 hours ago for SendGroupsToReMatchBackend")
+	wa.UserLogin.Log.Info().Time("last_history_sync", loginMetadata.LastHistorySync.Time).Msg("LastHistorySync time has been updated to force WhatsApp sync")
 
 	// Save the updated metadata
 	err := wa.UserLogin.Save(ctx)
@@ -558,6 +564,9 @@ func (wa *WhatsAppClient) SendGroupsToReMatchBackend(ctx context.Context) error 
 		wa.UserLogin.Log.Err(err).Msg("Failed to save updated LastHistorySync timestamp")
 		// Continue execution even if save fails
 	}
+
+	// Log the start of WhatsApp sync
+	wa.UserLogin.Log.Info().Msg("Syncing with WhatsApp started")
 
 	// Get the current user's JID
 	userWANumber := wa.JID.User

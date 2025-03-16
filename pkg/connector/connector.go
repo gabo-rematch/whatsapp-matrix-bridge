@@ -91,6 +91,7 @@ func (wa *WhatsAppConnector) Init(bridge *bridgev2.Bridge) {
 	wa.Bridge.Commands.(*commands.Processor).AddHandlers(
 		cmdAccept,
 		cmdListGroups,
+		cmdTestSyncTimer,
 	)
 	wa.mediaEditCache = make(MediaEditCache)
 

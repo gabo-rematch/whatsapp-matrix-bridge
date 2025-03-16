@@ -59,6 +59,10 @@ func (wa *WhatsAppClient) handleWAHistorySync(ctx context.Context, evt *waHistor
 	if evt == nil || evt.SyncType == nil {
 		return
 	}
+
+	// Log that sync with WhatsApp has started
+	wa.UserLogin.Log.Info().Msg("Syncing with WhatsApp started")
+
 	log := wa.UserLogin.Log.With().
 		Str("action", "store history sync").
 		Stringer("sync_type", evt.GetSyncType()).
@@ -85,13 +89,18 @@ func (wa *WhatsAppClient) handleWAHistorySync(ctx context.Context, evt *waHistor
 	if !loginMetadata.LastHistorySync.IsZero() {
 		lastSyncTime := loginMetadata.LastHistorySync.Time
 		if time.Since(lastSyncTime) < 24*time.Hour {
-			log.Info().
+			timeSinceLastSync := time.Since(lastSyncTime)
+			timeUntilNextSync := 24*time.Hour - timeSinceLastSync
+			log.Warn().
 				Time("last_sync", lastSyncTime).
-				Dur("time_since_last_sync", time.Since(lastSyncTime)).
-				Msg("Skipping automatic history sync, last sync was less than 24 hours ago")
+				Dur("time_since_last_sync", timeSinceLastSync).
+				Dur("time_until_next_sync", timeUntilNextSync).
+				Msg("SYNC SKIPPED: Automatic WhatsApp history sync skipped, last sync was less than 24 hours ago")
 			return
 		}
 	}
+
+	log.Info().Msg("24-hour sync period has elapsed, proceeding with history sync")
 
 	log.Info().
 		Int("conversation_count", len(evt.GetConversations())).
@@ -206,10 +215,13 @@ func (wa *WhatsAppClient) handleWAHistorySync(ctx context.Context, evt *waHistor
 	loginMetadata.LastHistorySync = jsontime.Unix{Time: time.Now()}
 	// We don't need to explicitly save the metadata as it's stored in the UserLogin object
 	// The bridge will handle persisting this when needed
-	log.Info().Time("last_sync_updated", time.Now()).Msg("Updated last history sync time")
+	log.Info().Time("last_history_sync", time.Now()).Msg("LastHistorySync time has been updated to force WhatsApp sync")
 }
 
 func (wa *WhatsAppClient) createPortalsFromHistorySync(ctx context.Context) {
+	// Log that sync with WhatsApp has started
+	wa.UserLogin.Log.Info().Msg("Syncing with WhatsApp started")
+
 	log := wa.UserLogin.Log.With().
 		Str("action", "create portals from history sync").
 		Logger()
