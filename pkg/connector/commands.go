@@ -23,6 +23,7 @@ import (
 
 	"go.mau.fi/mautrix-whatsapp/pkg/waid"
 	"go.mau.fi/util/jsontime"
+	"go.mau.fi/whatsmeow/proto/waHistorySync"
 )
 
 var (
@@ -47,6 +48,16 @@ var cmdListGroups = &commands.FullHandler{
 	Help: commands.HelpMeta{
 		Section:     HelpSectionGroups,
 		Description: "List all WhatsApp groups you are a member of.",
+	},
+	RequiresLogin: true,
+}
+
+var cmdTestSyncTimer = &commands.FullHandler{
+	Func: fnTestSyncTimer,
+	Name: "test-sync-timer",
+	Help: commands.HelpMeta{
+		Section:     HelpSectionGroups,
+		Description: "Test the 24-hour sync timer restriction. Will attempt to trigger a sync without resetting the timer.",
 	},
 	RequiresLogin: true,
 }
@@ -85,7 +96,7 @@ func fnListGroups(ce *commands.Event) {
 		// Set LastHistorySync to 24 hours ago to force a new sync
 		loginMetadata := login.Metadata.(*waid.UserLoginMetadata)
 		loginMetadata.LastHistorySync = jsontime.Unix{Time: time.Now().Add(-24 * time.Hour)}
-		ce.Log.Debug().Time("history_sync_reset_to", loginMetadata.LastHistorySync.Time).Msg("Reset LastHistorySync to 24 hours ago")
+		ce.Log.Info().Time("last_history_sync", loginMetadata.LastHistorySync.Time).Msg("LastHistorySync time has been updated to force WhatsApp sync")
 
 		// Save the updated metadata
 		err := login.Save(ce.Ctx)
@@ -99,6 +110,41 @@ func fnListGroups(ce *commands.Event) {
 			ce.Reply("Failed to send groups to ReMatch backend: %v", err)
 		} else {
 			ce.Reply("Successfully sent your WhatsApp groups to ReMatch backend.")
+		}
+	}
+}
+
+func fnTestSyncTimer(ce *commands.Event) {
+	if login := ce.User.GetDefaultLogin(); login == nil {
+		ce.Reply("No WhatsApp account found. Please use !wa login to connect your WhatsApp account.")
+	} else if !login.Client.IsLoggedIn() {
+		ce.Reply("Not logged in")
+	} else {
+		// Don't reset LastHistorySync - this will test if the 24-hour restriction works
+		client := login.Client.(*WhatsAppClient)
+
+		// Manually trigger a history sync attempt
+		loginMetadata := login.Metadata.(*waid.UserLoginMetadata)
+		lastSync := loginMetadata.LastHistorySync.Time
+		timeSinceLastSync := time.Since(lastSync)
+
+		ce.Log.Info().
+			Time("last_history_sync", lastSync).
+			Dur("time_since_last_sync", timeSinceLastSync).
+			Msg("Testing sync timer - attempting to sync without resetting timer")
+
+		// Create a dummy history sync event to test handleWAHistorySync
+		dummyEvt := &waHistorySync.HistorySync{
+			SyncType: waHistorySync.HistorySync_INITIAL_BOOTSTRAP.Enum(),
+		}
+
+		// This should respect the 24-hour rule and log a skip message if last sync was less than 24 hours ago
+		client.handleWAHistorySync(ce.Ctx, dummyEvt)
+
+		if timeSinceLastSync < 24*time.Hour {
+			ce.Reply("Sync test completed: Last sync was %s ago, which is less than 24 hours. Check logs for 'SYNC SKIPPED' message.", timeSinceLastSync.Round(time.Second))
+		} else {
+			ce.Reply("Sync test completed: Last sync was %s ago, which is more than 24 hours. A new sync should have been initiated.", timeSinceLastSync.Round(time.Second))
 		}
 	}
 }
